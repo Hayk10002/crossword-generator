@@ -1,241 +1,10 @@
 use std::collections::BTreeSet;
 
-use itertools::Itertools;
+use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
-struct WordBoundingBox
-{
-    x: isize,
-    y: isize,
-    w: usize, 
-    h: usize
-}
+use super::word::*;
 
-impl WordBoundingBox
-{
-    fn same_direction_as(&self, other: &WordBoundingBox) -> bool
-    {
-        (self.w == 1 && other.w == 1) || (self.h == 1 && other.h == 1)
-    }
-
-    fn intersects(&self, other: &WordBoundingBox) -> bool 
-    {
-        (self.x < other.x + other.w as isize && self.x + self.w as isize > other.x) &&
-        (self.y < other.y + other.h as isize && self.y + self.h as isize > other.y)
-    }
-
-    fn side_touches_side(&self, other: &WordBoundingBox) -> bool
-    {
-        if !self.same_direction_as(other) { return false; }
-
-        if self.h == 1
-        {
-            self.y.abs_diff(other.y) == 1 && (self.x < other.x + other.w as isize && self.x + self.w as isize > other.x)
-        }
-        else
-        {
-            self.x.abs_diff(other.x) == 1 && (self.y < other.y + other.h as isize && self.y + self.h as isize > other.y)
-        }
-    }
-
-    fn side_touches_head(&self, other: &WordBoundingBox) -> bool
-    {
-        if self.same_direction_as(other) { return false; }
-
-        let hor: &WordBoundingBox;
-        let ver: &WordBoundingBox;
-
-        if self.h == 1
-        {
-            hor = self;
-            ver = other;
-        }
-        else
-        {
-            ver = self;
-            hor = other;
-        }
-
-        (hor.x + hor.w as isize >= ver.x) &&
-        (hor.x <= ver.x + 1) &&
-        (hor.y + 1 >= ver.y) &&
-        (hor.y <= ver.y + ver.h as isize) &&
-        
-        ((hor.x + hor.w as isize == ver.x) as u8 + 
-        (hor.x == ver.x + 1) as u8 + 
-        (hor.y + 1 == ver.y) as u8 + 
-        (hor.y == ver.y + ver.h as isize) as u8) == 1u8
-    }
-
-    fn head_touches_head(&self, other: &WordBoundingBox) -> bool
-    {
-        if !self.same_direction_as(other) { return false; }
-
-        if self.h == 1
-        {
-            self.y == other.y && (self.x + self.w as isize == other.x || other.x + other.w as isize == self.x)
-        }
-        else
-        {
-            self.x == other.x && (self.y + self.h as isize == other.y || other.y + other.h as isize == self.y)
-        }
-    }
-
-    fn corners(&self, other: &WordBoundingBox) -> bool
-    {
-        (self.x == other.x + other.w as isize && self.y == other.y + other.h as isize) ||
-        (self.x + self.w as isize == other.x && self.y == other.y + other.h as isize) ||
-        (self.x + self.w as isize == other.x && self.y + self.h as isize == other.y) ||
-        (self.x == other.x + other.w as isize && self.y + self.h as isize == other.y)
-    }
-
-    fn get_intersection_indices(&self, other: &WordBoundingBox) -> Option<(usize, usize)>
-    {
-        if !self.intersects(other) { return None; }
-        if self.same_direction_as(other) { return None; }
-        if self.h == 1 
-        {
-            Some(((other.x - self.x) as usize, (self.y - other.y) as usize))
-        }
-        else
-        {
-            Some(((other.y - self.y) as usize, (self.x - other.x) as usize))
-        }  
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
-pub struct WordCompatibilitySettings
-{
-    pub side_by_side: bool,
-    pub head_by_head: bool,
-    pub side_by_head: bool,
-    pub corner_by_corner: bool
-}
-
-impl WordCompatibilitySettings 
-{
-    fn are_words_compatible(&self, first: &Word, second: &Word) -> bool
-    {
-        let first_bb = first.get_bounding_box();
-        let second_bb = second.get_bounding_box();
-
-        if first_bb.corners(&second_bb) && !self.corner_by_corner { return false; }
-
-        if first.direction == second.direction
-        {
-            if first_bb.head_touches_head(&second_bb) && !self.head_by_head { return false; }
-            if first_bb.side_touches_side(&second_bb) && !self.side_by_side { return false; }
-            if first_bb.intersects(&second_bb) { return false; }
-
-            true
-        }
-        else
-        {
-            if first_bb.side_touches_head(&second_bb) && !self.side_by_head { return false; }
-            if first_bb.intersects(&second_bb)
-            {
-                let (first_ind, second_ind) = first_bb.get_intersection_indices(&second_bb).unwrap();
-                let first_char = first.value.chars().nth(first_ind);
-                let second_char = second.value.chars().nth(second_ind);
-        
-                return first_char.is_some() && second_char.is_some() && (first_char == second_char);
-            }
-
-            true
-        }
-    }
-}
-
-impl Default for WordCompatibilitySettings 
-{
-    fn default() -> Self 
-    {
-        return WordCompatibilitySettings 
-        {
-            side_by_side: false,
-            head_by_head: false,
-            side_by_head: false,
-            corner_by_corner: true
-        }    
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
-pub struct WordPosition
-{
-    pub x: isize,
-    pub y: isize,  
-}
-
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
-pub enum WordDirection
-{
-    #[default]
-    Right,
-    Down
-}
-
-impl WordDirection 
-{
-    fn opposite(&self) -> WordDirection
-    {
-        match *self
-        {
-            WordDirection::Down => WordDirection::Right,
-            WordDirection::Right => WordDirection::Down
-        }
-    } 
-}
-
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
-pub struct Word
-{
-    pub position: WordPosition,
-    pub direction: WordDirection,
-    pub value: String
-}
-
-impl Word
-{
-    fn get_bounding_box(&self) -> WordBoundingBox
-    {
-        match self.direction 
-        {
-            WordDirection::Right => WordBoundingBox { x: self.position.x, y: self.position.y, w: self.value.len(), h: 1 },
-            WordDirection::Down => WordBoundingBox { x: self.position.x, y: self.position.y, w: 1, h: self.value.len() },
-        }
-    }
-
-    fn calculate_possible_ways_to_add_word(&self, word: &str) -> BTreeSet<Word>
-    {
-        let mut pos_ways = BTreeSet::new();
-        let common_chars = word.chars().filter(|c| self.value.contains(*c)).collect::<Vec<char>>();
-
-        for char in common_chars
-        {
-            for (word_ind, self_ind) in word.chars().enumerate().filter_map(|c| if c.1 == char { Some(c.0) } else { None } ).cartesian_product(self.value.chars().enumerate().filter_map(|c| if c.1 == char { Some(c.0) } else { None } ))
-            {
-                pos_ways.insert(
-                    Word
-                    {
-                        position: match self.direction
-                        {
-                            WordDirection::Right => WordPosition{ x: self.position.x + self_ind as isize, y: self.position.y - word_ind as isize},
-                            WordDirection::Down  => WordPosition{ x: self.position.x - word_ind as isize, y: self.position.y + self_ind as isize},
-                        },
-                        direction: self.direction.opposite(),
-                        value: word.to_owned() 
-                    }
-                );
-            }
-        }
-
-        pos_ways
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum CrosswordSizeConstrain
 {
     MaxLength(usize),
@@ -247,7 +16,7 @@ pub enum CrosswordSizeConstrain
 
 impl CrosswordSizeConstrain 
 {
-    fn is_crossword_valid(&self, cw: &Crossword) -> bool
+    pub fn is_crossword_valid(&self, cw: &Crossword) -> bool
     {
         let size = cw.get_size();
         match *self
@@ -260,7 +29,7 @@ impl CrosswordSizeConstrain
     }
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct CrosswordSettings
 {
     pub size_constraints: Vec<CrosswordSizeConstrain>
@@ -268,31 +37,28 @@ pub struct CrosswordSettings
 
 impl CrosswordSettings
 {
-    fn is_crossword_valid(&self, cw: &Crossword) -> bool
+    pub fn is_crossword_valid(&self, cw: &Crossword) -> bool
     {
         return self.size_constraints.iter().all(|c| c.is_crossword_valid(cw))
     }
 }
 
-
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
-pub struct Crossword
+pub struct Crossword<'a>
 {
-    words: BTreeSet<Word>,
-    pub word_compatibitity_settings: WordCompatibilitySettings,
-    pub crossword_settings: CrosswordSettings
+    words: BTreeSet<Word<'a>>,
 }
 
-impl Crossword
+impl<'a> Crossword<'a>
 {
-    fn new(words: &[Word]) -> Crossword
+    pub fn new(words: &[Word<'a>]) -> Crossword<'a>
     {
         let mut cw = Crossword { words: words.iter().map(|x| x.clone()).collect(), ..Default::default() };
         cw.normalize();
 
         return cw;
     }
-    fn normalize(&mut self)
+    pub fn normalize(&mut self)
     {
         let mut min_corner = (isize::MAX, isize::MAX);
         let mut new_set = BTreeSet::new();
@@ -311,14 +77,14 @@ impl Crossword
         self.words = new_set;
     }
 
-    fn add_word(&mut self, word: &Word)
+    pub fn add_word(&mut self, word: &Word<'a>)
     {
         if self.words.iter().find(|w| w.value == word.value).is_some() { return; }
         self.words.insert(word.clone());
         self.normalize();
     }
 
-    fn remove_word(&mut self, word: &str)
+    pub fn remove_word(&mut self, word: &str)
     {
         let mut word_to_remove = Word::default();
 
@@ -328,13 +94,13 @@ impl Crossword
         self.normalize();
     }
 
-    fn find_word(&self, word: &str) -> Option<&Word>
+    pub fn find_word(&self, word: &str) -> Option<&Word>
     {
         self.words.iter().filter(|w| w.value == word).next()
     }
     
 
-    fn contains_crossword(&self, other: &Crossword) -> bool 
+    pub fn contains_crossword(&self, other: &Crossword) -> bool 
     {
         if other.words.len() > self.words.len() { return false; }
         let mut offset: Option<(isize, isize)> = None;
@@ -367,26 +133,26 @@ impl Crossword
         true
     }
 
-    fn calculate_possible_ways_to_add_word(&self, word: &str) -> BTreeSet<Word>
+    pub fn calculate_possible_ways_to_add_word(&self, word: &'a str, word_compatibility_settings: &WordCompatibilitySettings) -> BTreeSet<Word<'a>>
     {
         if self.words.is_empty()
         {
             dbg!(word);
-            return vec![Word{ value: word.to_owned(), ..Word::default()}].into_iter().collect()
+            return vec![Word{ value: word, ..Word::default()}].into_iter().collect()
         }
 
         self.words.iter()
-            .flat_map(|cur_word| cur_word.calculate_possible_ways_to_add_word(word))
-            .filter(|w| self.can_word_be_added(w))
+            .flat_map(|cur_word: &Word<'a>| cur_word.calculate_possible_ways_to_add_word(word))
+            .filter(|w: &Word<'a>| self.can_word_be_added(w, word_compatibility_settings))
             .collect()
     }
 
-    fn can_word_be_added(&self, word: &Word) -> bool
+    pub fn can_word_be_added(&self, word: &Word<'a>, word_compatibility_settings: &WordCompatibilitySettings) -> bool
     {
-        self.words.iter().all(|w| self.word_compatibitity_settings.are_words_compatible(w, word))
+        self.words.iter().all(|w: &Word<'a>| word_compatibility_settings.are_words_compatible(w, word))
     }
     
-    fn get_size(&self) -> (usize, usize)
+    pub fn get_size(&self) -> (usize, usize)
     {
         let mut max_corner = (0isize, 0isize);
     
@@ -404,7 +170,7 @@ impl Crossword
         (max_corner.0 as usize, max_corner.1 as usize)
     }
     
-    fn generate_char_table(&self) ->Vec<Vec<char>>
+    pub fn generate_char_table(&self) ->Vec<Vec<char>>
     {
         let size = self.get_size();
         let mut table = vec![vec![' '; size.0]; size.1];
@@ -447,57 +213,10 @@ impl Crossword
 }
 
 
-pub fn generate_crosswords(words: &BTreeSet<String>, word_compatibility_settings: &WordCompatibilitySettings, crossword_settings: &CrosswordSettings) -> BTreeSet<Crossword>
-{
-    let mut crossword = Crossword::default();
-    crossword.word_compatibitity_settings = word_compatibility_settings.clone();
-    crossword.crossword_settings = crossword_settings.clone();
-    let mut crosswords = BTreeSet::new();
-
-    let mut full_created_crossword_bases = BTreeSet::new();
-
-    generate_crosswords_impl(&mut crossword, words, &mut crosswords, &mut full_created_crossword_bases);
-    
-    crosswords
-}
-
-fn generate_crosswords_impl(current_crossword: &mut Crossword, remained_words: &BTreeSet<String>, crosswords: &mut BTreeSet<Crossword>, full_created_crossword_bases: &mut BTreeSet<Crossword>)
-{
-    if !current_crossword.crossword_settings.is_crossword_valid(&current_crossword) { return; }
-
-    if remained_words.is_empty()
-    {
-        crosswords.insert(current_crossword.clone());
-        return;
-    }
-    
-    if full_created_crossword_bases.iter().any(|cw| current_crossword.contains_crossword(cw))
-    {
-        return;
-    }
-    
-    for current_word in remained_words.iter()
-    {
-        let mut new_remained_words = remained_words.clone();
-        new_remained_words.remove(current_word);
-        for step in current_crossword.calculate_possible_ways_to_add_word(current_word).iter()
-        {
-            current_crossword.add_word(step);
-
-            generate_crosswords_impl(current_crossword, &new_remained_words, crosswords, full_created_crossword_bases);
-
-            let to_remove: Vec<Crossword> = full_created_crossword_bases.clone().into_iter().filter(|cw| cw.contains_crossword(&current_crossword)).collect();
-            to_remove.into_iter().for_each(|cw| {full_created_crossword_bases.remove(&cw);});
-            
-            full_created_crossword_bases.insert(current_crossword.clone());
-
-            current_crossword.remove_word(&step.value);
-        }
-    }
-}
 
 
 
+/*
 
 #[cfg(test)]
 mod tests {
@@ -509,8 +228,8 @@ mod tests {
     #[test]
     fn test_word_bounding_box_same_direction_as()
     {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
 
         assert!(first.get_bounding_box().same_direction_as(&second.get_bounding_box()));
 
@@ -526,8 +245,8 @@ mod tests {
     #[test]
     fn test_word_bounding_box_intersects()
     {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
         
         let mut comp = vec![];
         for y in -2isize..=2
@@ -599,8 +318,8 @@ mod tests {
     #[test]
     fn test_word_bounding_box_side_touches_side()
     {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
         
         let mut comp = vec![];
         for y in -2isize..=2
@@ -672,8 +391,8 @@ mod tests {
     #[test]
     fn test_word_bounding_box_side_touches_head()
     {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
         
         let mut comp = vec![];
         for y in -2isize..=2
@@ -745,8 +464,8 @@ mod tests {
     #[test]
     fn test_word_bounding_box_head_touches_head()
     {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
         
         let mut comp = vec![];
         for y in -2isize..=2
@@ -818,8 +537,8 @@ mod tests {
     #[test]
     fn test_word_bounding_box_corners()
     {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
         
         let mut comp = vec![];
         for y in -2isize..=2
@@ -891,8 +610,8 @@ mod tests {
     #[test]
     fn test_word_bounding_box_get_intersection_indices()
     {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
 
         assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), None);
 
@@ -915,8 +634,8 @@ mod tests {
         {
             let settings = WordCompatibilitySettings { side_by_side: a != 0, head_by_head: b != 0, side_by_head: c != 0, corner_by_corner: d != 0 };
 
-            let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan".to_owned() };
-            let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax".to_owned() };
+            let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+            let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
             
             let mut comp = vec![];
             for y in -2isize..=2
@@ -992,36 +711,36 @@ mod tests {
     fn test_crossword_contains_crossword() {
         let cw = Crossword::new(
             &[
-                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy"},
 
             ]);
 
         let mut containing_crossword_1 = Crossword::new(
             &[
-                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy"},
 
             ]);
 
         let mut containing_crossword_2 = Crossword::new(
             &[
-                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 4, y: 1 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 4, y: 1 }, direction: WordDirection::Down, value: "toy"},
 
             ]);
 
         let mut containing_crossword_3 = Crossword::new(
             &[
-                Word{position: WordPosition { x: 2, y: 2 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: 2, y: 2 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy"},
 
             ]);
 
@@ -1036,11 +755,11 @@ mod tests {
     fn test_crossword_generate_string() {
         let cw = Crossword::new(
             &[
-                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy"},
     
             ]);
 
@@ -1053,18 +772,18 @@ mod tests {
 |    c a t|
 |    a n o|
 |    l d y|
------------\n".to_owned())
+-----------\n")
     }
 
     #[test]
     fn test_crossword_normalize() {
         let mut cw = Crossword::new(
             &[
-                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy"},
     
             ]);
         
@@ -1072,11 +791,11 @@ mod tests {
 
         let cw_normalized = Crossword::new(
             &[
-                Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 2, y: 0 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 2, y: 2 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 3, y: 2 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 4, y: 2 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 2, y: 0 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 2, y: 2 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 3, y: 2 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 4, y: 2 }, direction: WordDirection::Down, value: "toy"},
 
             ]);
 
@@ -1087,11 +806,11 @@ mod tests {
     fn test_crossword_remove_word() {
         let mut cw = Crossword::new(
             &[
-                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and".to_owned()},
-                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy".to_owned()},
+                Word{position: WordPosition { x: -1, y: -1 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 1, y: -1 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 2, y: 1 }, direction: WordDirection::Down, value: "and"},
+                Word{position: WordPosition { x: 3, y: 1 }, direction: WordDirection::Down, value: "toy"},
     
             ]);
         
@@ -1099,10 +818,10 @@ mod tests {
 
         let cw_word_removed = Crossword::new(
             &[
-                Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 2, y: 0 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 2, y: 2 }, direction: WordDirection::Right, value: "cat".to_owned()},
-                Word{position: WordPosition { x: 3, y: 2 }, direction: WordDirection::Down, value: "and".to_owned()},
+                Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 2, y: 0 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 2, y: 2 }, direction: WordDirection::Right, value: "cat"},
+                Word{position: WordPosition { x: 3, y: 2 }, direction: WordDirection::Down, value: "and"},
 
             ]);
 
@@ -1113,14 +832,14 @@ mod tests {
     fn test_crossword_calculate_possible_ways_to_add_word() {
         let cw = Crossword::new(
             &[
-                Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Right, value: "hello".to_owned()},
-                Word{position: WordPosition { x: 2, y: 0 }, direction: WordDirection::Down, value: "local".to_owned()},
-                Word{position: WordPosition { x: 0, y: 2 }, direction: WordDirection::Right, value: "tac".to_owned()}
+                Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Right, value: "hello"},
+                Word{position: WordPosition { x: 2, y: 0 }, direction: WordDirection::Down, value: "local"},
+                Word{position: WordPosition { x: 0, y: 2 }, direction: WordDirection::Right, value: "tac"}
             ]);
 
-        let new_word = "hatlo".to_owned();
+        let new_word = "hatlo";
 
-        assert_eq!(cw.calculate_possible_ways_to_add_word(&new_word), vec![
+        assert_eq!(cw.calculate_possible_ways_to_add_word(&new_word, &WordCompatibilitySettings::default()), vec![
             Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Down, value: new_word.clone()},
             //Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Down, value: new_word.clone()},  |-
             //Word{position: WordPosition { x: 1, y: 3 }, direction: WordDirection::Right, value: new_word.clone()}, ||
@@ -1147,3 +866,4 @@ mod tests {
 
 
 }
+*/

@@ -1,0 +1,26 @@
+{
+    "words": [
+        "kakashka",
+        "pukpuk",
+        "kxtar",
+        "zglxich",
+        "hori",
+        "pipi",
+        "bxkik"
+    ],
+    "settings": {
+        "word_compatibility_settings": {
+            "side_by_side": true,
+            "head_by_head": true,
+            "side_by_head": false,
+            "corner_by_corner": true
+        },
+        "crossword_settings": {
+            "size_constraints": [
+                {
+                    "MaxArea": 60
+                }
+            ]
+        }
+    }
+}
