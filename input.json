@@ -1,26 +1,21 @@
 {
     "words": [
-        "kakashka",
-        "pukpuk",
-        "kxtar",
-        "zglxich",
-        "hori",
-        "pipi",
-        "bxkik"
+        "sea",
+        "ocean",
+        "water",
+        "beach",
+        "engineer",
+        "value"
     ],
     "settings": {
         "word_compatibility_settings": {
-            "side_by_side": true,
-            "head_by_head": true,
+            "side_by_side": false,
+            "head_by_head": false,
             "side_by_head": false,
             "corner_by_corner": true
         },
         "crossword_settings": {
-            "size_constraints": [
-                {
-                    "MaxArea": 60
-                }
-            ]
+            "size_constraints": []
         }
     }
 }

@@ -237,3 +237,493 @@ impl<'a> Word<'a>
     }
 }
 
+
+#[cfg(test)]
+mod tests
+{
+    use itertools::iproduct;
+
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_word_bounding_box_same_direction_as()
+    {
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+
+        assert!(first.get_bounding_box().same_direction_as(&second.get_bounding_box()));
+
+        first.direction = WordDirection::Down;
+
+        assert!(!first.get_bounding_box().same_direction_as(&second.get_bounding_box()));
+
+        second.direction = WordDirection::Down;
+        
+        assert!(first.get_bounding_box().same_direction_as(&second.get_bounding_box()));
+    }
+
+    #[test]
+    fn test_word_bounding_box_intersects()
+    {
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+        
+        let mut comp = vec![];
+        for y in -2isize..=2
+        {
+            for x in -6isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().intersects(&second.get_bounding_box()) as isize);
+            }
+        }
+    
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_hor");
+        
+        first.direction = WordDirection::Down;
+        second.direction = WordDirection::Down;
+        comp = vec![];
+        for y in -6isize..=9
+        {
+            for x in -2isize..=2
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().intersects(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0], "ver_ver");
+
+        first.direction = WordDirection::Right;
+        comp = vec![];
+        for y in -6isize..=2
+        {
+            for x in -2isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().intersects(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_ver");
+    }
+
+    #[test]
+    fn test_word_bounding_box_side_touches_side()
+    {
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+        
+        let mut comp = vec![];
+        for y in -2isize..=2
+        {
+            for x in -6isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().side_touches_side(&second.get_bounding_box()) as isize);
+            }
+        }
+    
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_hor");
+        
+        first.direction = WordDirection::Down;
+        second.direction = WordDirection::Down;
+        comp = vec![];
+        for y in -6isize..=9
+        {
+            for x in -2isize..=2
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().side_touches_side(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 1, 0, 1, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0], "ver_ver");
+
+        first.direction = WordDirection::Right;
+        comp = vec![];
+        for y in -6isize..=2
+        {
+            for x in -2isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().side_touches_side(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_ver");
+    }
+
+    #[test]
+    fn test_word_bounding_box_side_touches_head()
+    {
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+        
+        let mut comp = vec![];
+        for y in -2isize..=2
+        {
+            for x in -6isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().side_touches_head(&second.get_bounding_box()) as isize);
+            }
+        }
+    
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_hor");
+        
+        first.direction = WordDirection::Down;
+        second.direction = WordDirection::Down;
+        comp = vec![];
+        for y in -6isize..=9
+        {
+            for x in -2isize..=2
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().side_touches_head(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0], "ver_ver");
+
+        first.direction = WordDirection::Right;
+        comp = vec![];
+        for y in -6isize..=2
+        {
+            for x in -2isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().side_touches_head(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_ver");
+    }
+    
+    #[test]
+    fn test_word_bounding_box_head_touches_head()
+    {
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+        
+        let mut comp = vec![];
+        for y in -2isize..=2
+        {
+            for x in -6isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().head_touches_head(&second.get_bounding_box()) as isize);
+            }
+        }
+    
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_hor");
+        
+        first.direction = WordDirection::Down;
+        second.direction = WordDirection::Down;
+        comp = vec![];
+        for y in -6isize..=9
+        {
+            for x in -2isize..=2
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().head_touches_head(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 1, 0, 0,
+                                0, 0, 0, 0, 0], "ver_ver");
+
+        first.direction = WordDirection::Right;
+        comp = vec![];
+        for y in -6isize..=2
+        {
+            for x in -2isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().head_touches_head(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_ver");
+    }
+
+    #[test]
+    fn test_word_bounding_box_corners()
+    {
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+        
+        let mut comp = vec![];
+        for y in -2isize..=2
+        {
+            for x in -6isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().corners(&second.get_bounding_box()) as isize);
+            }
+        }
+    
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_hor");
+        
+        first.direction = WordDirection::Down;
+        second.direction = WordDirection::Down;
+        comp = vec![];
+        for y in -6isize..=9
+        {
+            for x in -2isize..=2
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().corners(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0,
+                                0, 1, 0, 1, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0,
+                                0, 1, 0, 1, 0,
+                                0, 0, 0, 0, 0], "ver_ver");
+
+        first.direction = WordDirection::Right;
+        comp = vec![];
+        for y in -6isize..=2
+        {
+            for x in -2isize..=9
+            {
+                second.position = WordPosition {x, y};
+                comp.push(first.get_bounding_box().corners(&second.get_bounding_box()) as isize);
+            }
+        }
+
+        assert_eq!(comp, vec![  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hor_ver");
+    }
+
+    #[test]
+    fn test_word_bounding_box_get_intersection_indices()
+    {
+        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+
+        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), None);
+
+        first.direction = WordDirection::Down;
+        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), Some((0, 0)));
+
+        second.position = WordPosition {x: -1, y: 2};
+        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), Some((2, 1)));
+
+        second.position.x = 2;
+        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), None);
+    }
+
+
+
+    #[test]
+    fn test_word_compatibility_settings_are_words_compatible() {
+
+        for (a, b, c, d) in iproduct!((0isize..2), (0isize..2), (0isize..2), (0isize..2))
+        {
+            let settings = WordCompatibilitySettings { side_by_side: a != 0, head_by_head: b != 0, side_by_head: c != 0, corner_by_corner: d != 0 };
+
+            let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
+            let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
+            
+            let mut comp = vec![];
+            for y in -2isize..=2
+            {
+                for x in -6isize..=9
+                {
+                    second.position = WordPosition {x, y};
+                    comp.push(settings.are_words_compatible(&first, &second) as isize);
+                }
+            }
+        
+            assert_eq!(comp, vec![  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                                    1, d, a, a, a, a, a, a, a, a, a, a, a, a, d, 1,
+                                    1, b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b, 1,
+                                    1, d, a, a, a, a, a, a, a, a, a, a, a, a, d, 1,
+                                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "hor_hor with settings {:?}", settings);
+            
+            first.direction = WordDirection::Down;
+            second.direction = WordDirection::Down;
+            comp = vec![];
+            for y in -6isize..=9
+            {
+                for x in -2isize..=2
+                {
+                    second.position = WordPosition {x, y};
+                    comp.push(settings.are_words_compatible(&first, &second) as isize);
+                }
+            }
+
+            assert_eq!(comp, vec![  1, 1, 1, 1, 1,
+                                    1, d, b, d, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, a, 0, a, 1,
+                                    1, d, b, d, 1,
+                                    1, 1, 1, 1, 1], "ver_ver with settings {:?}", settings);
+
+            first.direction = WordDirection::Right;
+            comp = vec![];
+            for y in -6isize..=2
+            {
+                for x in -2isize..=9
+                {
+                    second.position = WordPosition {x, y};
+                    comp.push(settings.are_words_compatible(&first, &second) as isize);
+                }
+            }
+
+            assert_eq!(comp, vec![  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                                    1, d, c, c, c, c, c, c, c, c, d, 1,
+                                    1, c, 0, 0, 0, 0, 0, 0, 0, 0, c, 1,
+                                    1, c, 0, 1, 0, 1, 0, 0, 1, 0, c, 1,
+                                    1, c, 0, 0, 0, 0, 0, 0, 0, 0, c, 1,
+                                    1, c, 0, 0, 0, 0, 0, 0, 0, 0, c, 1,
+                                    1, c, 0, 1, 0, 1, 0, 0, 1, 0, c, 1,
+                                    1, d, c, c, c, c, c, c, c, c, d, 1,
+                                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "hor_ver with settings {:?}", settings);
+        }
+
+    }
+}

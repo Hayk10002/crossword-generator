@@ -1,4 +1,8 @@
 use std::collections::BTreeSet;
+use corosensei::CoroutineResult;
+use corosensei::ScopedCoroutine;
+use corosensei::Yielder;
+use corosensei::stack::DefaultStack;
 use serde::{Serialize, Deserialize};
 
 use crate::word::*;
@@ -22,24 +26,19 @@ impl CrosswordGenerator
 {
     pub fn generate_crosswords(&self) -> BTreeSet<Crossword>
     {
-        let mut crossword = Crossword::new(&[]);
-        let mut crosswords = BTreeSet::new();
-        let words = self.words.iter().map(|s| s.as_str()).collect::<BTreeSet<&str>>();
-
-        let mut full_created_crossword_bases = BTreeSet::new();
-
-        self.generate_crosswords_impl(&mut crossword, &words, &mut crosswords, &mut full_created_crossword_bases);
-        
-        crosswords
+        self.crossword_iter().collect::<BTreeSet<Crossword>>()
     }
 
-    fn generate_crosswords_impl<'a>(&self, current_crossword: &mut Crossword<'a>, remained_words: &BTreeSet<&'a str>, crosswords: &mut BTreeSet<Crossword<'a>>, full_created_crossword_bases: &mut BTreeSet<Crossword<'a>>)
+    fn generate_crosswords_impl<'a>(&self, yielder: &Yielder<(), Crossword<'a>>, current_crossword: &mut Crossword<'a>, remained_words: &BTreeSet<&'a str>, crosswords: &mut BTreeSet<Crossword<'a>>, full_created_crossword_bases: &mut BTreeSet<Crossword<'a>>)
     {
         if !self.settings.crossword_settings.is_crossword_valid(&current_crossword) { return; }
 
         if remained_words.is_empty()
         {
-            crosswords.insert(current_crossword.clone());
+            if crosswords.insert(current_crossword.clone())
+            {
+                yielder.suspend(current_crossword.clone());
+            }
             return;
         }
         
@@ -56,7 +55,7 @@ impl CrosswordGenerator
             {
                 current_crossword.add_word(step);
 
-                self.generate_crosswords_impl(current_crossword, &new_remained_words, crosswords, full_created_crossword_bases);
+                self.generate_crosswords_impl(yielder, current_crossword, &new_remained_words, crosswords, full_created_crossword_bases);
 
                 let to_remove: Vec<Crossword<'a>> = full_created_crossword_bases.clone().into_iter().filter(|cw| cw.contains_crossword(&current_crossword)).collect();
                 to_remove.into_iter().for_each(|cw| {full_created_crossword_bases.remove(&cw);});
@@ -65,6 +64,41 @@ impl CrosswordGenerator
 
                 current_crossword.remove_word(&step.value);
             }
+        }
+    }
+
+    pub fn crossword_iter(&self) -> CrosswordIterator 
+    {
+        return CrosswordIterator
+        {
+            generating_coroutine: ScopedCoroutine::new(|yielder, _|
+            {
+                let mut crossword = Crossword::new(&[]);
+                let mut crosswords = BTreeSet::new();
+                let words = self.words.iter().map(|s| s.as_str()).collect::<BTreeSet<&str>>();
+
+                let mut full_created_crossword_bases = BTreeSet::new();
+
+                self.generate_crosswords_impl(yielder,&mut crossword, &words, &mut crosswords, &mut full_created_crossword_bases);
+
+            })
+        }
+    }   
+}
+
+pub struct CrosswordIterator<'a>
+{
+    generating_coroutine: ScopedCoroutine<'a, (), Crossword<'a>, (), DefaultStack>,
+}
+
+impl<'a> Iterator for CrosswordIterator<'a>
+{
+    type Item = Crossword<'a>;
+    fn next(&mut self) -> Option<Self::Item>
+    {
+        match self.generating_coroutine.resume(()) {
+            CoroutineResult::Yield(crossword) => Some(crossword),
+            CoroutineResult::Return(()) => None,
         }
     }
 }

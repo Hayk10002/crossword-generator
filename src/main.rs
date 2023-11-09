@@ -6,6 +6,7 @@ mod word;
 mod crossword;
 
 use generator::*;
+use itertools::Itertools;
 
 fn main() -> Result<(), Error>
 {
@@ -13,13 +14,15 @@ fn main() -> Result<(), Error>
 
     let mut output = File::create("output.txt")?;
 
-    let cws = generator.generate_crosswords();
-    for (ind, cw) in cws.iter().enumerate()
+    let cw_iter = generator.crossword_iter();
+    for (ind, cw) in cw_iter.sorted_by_key(|a| 
+        { 
+            let (x, y) = a.get_size();
+            x * y
+        }).enumerate()
     {
         write!(output, "{}.\n{}\n\n\n", ind + 1, cw.generate_string())?;
     }
-
-    println!("found {} crosswords", cws.len());
 
     Ok(())
     
