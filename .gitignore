@@ -1,2 +1,2 @@
-/benches
-/target
+benches/
+target/
