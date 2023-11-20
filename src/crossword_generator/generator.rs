@@ -278,8 +278,7 @@ impl<'a> Iterator for CrosswordIteratorRecursive<'a>
 
 
 
-#[cfg(test)]
-#[cfg(feature = "rec-iter")]
+#[cfg(all(test, feature = "rec-iter"))]
 mod tests {
     
 
