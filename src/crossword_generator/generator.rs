@@ -278,14 +278,15 @@ impl<'a> Iterator for CrosswordIteratorRecursive<'a>
 
 
 
-#[cfg(all(test, feature = "rec-iter"))]
+#[cfg(test)]
 mod tests {
     
 
     use super::*;
 
+    #[cfg(feature = "rec-iter")]
     #[test]
-    fn test_run() {
+    fn test_iterators() {
         let mut generator = CrosswordGenerator::default();
         generator.settings = CrosswordGeneratorSettings::default();
         generator.settings.crossword_settings.size_constraints.push(CrosswordSizeConstrain::MaxLength(13));
@@ -294,4 +295,12 @@ mod tests {
         assert_eq!(generator.crossword_iter().count(), generator.crossword_iter_rec().count());
     }
 
+    #[test]
+    fn test_one_character_words()
+    {
+        let mut generator = CrosswordGenerator::default();
+        generator.settings = CrosswordGeneratorSettings::default();
+        generator.words = vec!["a", "accb", "b"].into_iter().map(|s| s.to_lowercase()).collect();
+        assert_eq!(generator.crossword_iter().count(), 2);
+    }
 }

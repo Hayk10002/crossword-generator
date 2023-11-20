@@ -16,25 +16,22 @@ impl WordCompatibilitySettings
 {
     pub fn are_words_compatible(&self, first: &Word, second: &Word) -> bool
     {
-        let first_bb = first.get_bounding_box();
-        let second_bb = second.get_bounding_box();
-
-        if first_bb.corners(&second_bb) && !self.corner_by_corner { return false; }
+        if first.corners_touch(&second) && !self.corner_by_corner { return false; }
 
         if first.direction == second.direction
         {
-            if first_bb.head_touches_head(&second_bb) && !self.head_by_head { return false; }
-            if first_bb.side_touches_side(&second_bb) && !self.side_by_side { return false; }
-            if first_bb.intersects(&second_bb) { return false; }
+            if first.head_touches_head(&second) && !self.head_by_head { return false; }
+            if first.side_touches_side(&second) && !self.side_by_side { return false; }
+            if first.intersects(&second) { return false; }
 
             true
         }
         else
         {
-            if first_bb.side_touches_head(&second_bb) && !self.side_by_head { return false; }
-            if first_bb.intersects(&second_bb)
+            if first.side_touches_head(&second) && !self.side_by_head { return false; }
+            if first.intersects(&second)
             {
-                let (first_ind, second_ind) = first_bb.get_intersection_indices(&second_bb).unwrap();
+                let (first_ind, second_ind) = first.get_intersection_indices(&second).unwrap();
                 let first_char = first.value.chars().nth(first_ind);
                 let second_char = second.value.chars().nth(second_ind);
         
@@ -71,75 +68,19 @@ struct WordBoundingBox
 
 impl WordBoundingBox
 {
-    fn same_direction_as(&self, other: &WordBoundingBox) -> bool
-    {
-        (self.w == 1 && other.w == 1) || (self.h == 1 && other.h == 1)
-    }
-
     fn intersects(&self, other: &WordBoundingBox) -> bool 
     {
         (self.x < other.x + other.w as isize && self.x + self.w as isize > other.x) &&
         (self.y < other.y + other.h as isize && self.y + self.h as isize > other.y)
     }
 
-    fn side_touches_side(&self, other: &WordBoundingBox) -> bool
+    fn sides_touch(&self, other: &WordBoundingBox) -> bool
     {
-        if !self.same_direction_as(other) { return false; }
-
-        if self.h == 1
-        {
-            self.y.abs_diff(other.y) == 1 && (self.x < other.x + other.w as isize && self.x + self.w as isize > other.x)
-        }
-        else
-        {
-            self.x.abs_diff(other.x) == 1 && (self.y < other.y + other.h as isize && self.y + self.h as isize > other.y)
-        }
+        ((self.x + self.w as isize > other.x && self.x < other.x + other.w as isize) && (self.y + self.h as isize == other.y || other.y + other.h as isize == self.y)) || 
+        ((self.y + self.h as isize > other.y && self.y < other.y + other.h as isize) && (self.x + self.w as isize == other.x || other.x + other.w as isize == self.x))
     }
 
-    fn side_touches_head(&self, other: &WordBoundingBox) -> bool
-    {
-        if self.same_direction_as(other) { return false; }
-
-        let hor: &WordBoundingBox;
-        let ver: &WordBoundingBox;
-
-        if self.h == 1
-        {
-            hor = self;
-            ver = other;
-        }
-        else
-        {
-            ver = self;
-            hor = other;
-        }
-
-        (hor.x + hor.w as isize >= ver.x) &&
-        (hor.x <= ver.x + 1) &&
-        (hor.y + 1 >= ver.y) &&
-        (hor.y <= ver.y + ver.h as isize) &&
-        
-        ((hor.x + hor.w as isize == ver.x) as u8 + 
-        (hor.x == ver.x + 1) as u8 + 
-        (hor.y + 1 == ver.y) as u8 + 
-        (hor.y == ver.y + ver.h as isize) as u8) == 1u8
-    }
-
-    fn head_touches_head(&self, other: &WordBoundingBox) -> bool
-    {
-        if !self.same_direction_as(other) { return false; }
-
-        if self.h == 1
-        {
-            self.y == other.y && (self.x + self.w as isize == other.x || other.x + other.w as isize == self.x)
-        }
-        else
-        {
-            self.x == other.x && (self.y + self.h as isize == other.y || other.y + other.h as isize == self.y)
-        }
-    }
-
-    fn corners(&self, other: &WordBoundingBox) -> bool
+    fn corners_touch(&self, other: &WordBoundingBox) -> bool
     {
         (self.x == other.x + other.w as isize && self.y == other.y + other.h as isize) ||
         (self.x + self.w as isize == other.x && self.y == other.y + other.h as isize) ||
@@ -147,19 +88,6 @@ impl WordBoundingBox
         (self.x == other.x + other.w as isize && self.y + self.h as isize == other.y)
     }
 
-    fn get_intersection_indices(&self, other: &WordBoundingBox) -> Option<(usize, usize)>
-    {
-        if !self.intersects(other) { return None; }
-        if self.same_direction_as(other) { return None; }
-        if self.h == 1 
-        {
-            Some(((other.x - self.x) as usize, (self.y - other.y) as usize))
-        }
-        else
-        {
-            Some(((other.y - self.y) as usize, (self.x - other.x) as usize))
-        }  
-    }
 }
 
 
@@ -209,6 +137,72 @@ impl<'a> Word<'a>
         }
     }
 
+    fn get_parallel_coordinate(&self) -> isize
+    {
+        match self.direction
+        {
+            WordDirection::Right => self.position.y,
+            WordDirection::Down => self.position.x,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn get_perpendicular_coordinate(&self) -> isize
+    {
+        match self.direction
+        {
+            WordDirection::Right => self.position.x,
+            WordDirection::Down => self.position.y,
+        }
+    }
+
+    fn intersects(&self, other: &Word) -> bool 
+    {
+        self.get_bounding_box().intersects(&other.get_bounding_box())
+    }
+
+    fn sides_touch(&self, other: &Word) -> bool
+    {
+        self.get_bounding_box().sides_touch(&other.get_bounding_box())
+    }
+
+    fn corners_touch(&self, other: &Word) -> bool
+    {
+        self.get_bounding_box().corners_touch(&other.get_bounding_box())
+    }
+
+    fn side_touches_side(&self, other: &Word) -> bool
+    {
+        self.direction == other.direction &&
+        self.sides_touch(other) && 
+        self.get_parallel_coordinate() != other.get_parallel_coordinate()
+    }
+
+    fn side_touches_head(&self, other: &Word) -> bool
+    {
+        self.direction != other.direction &&
+        self.sides_touch(other)
+    }
+
+    fn head_touches_head(&self, other: &Word) -> bool
+    {
+        self.direction == other.direction &&
+        self.sides_touch(other) && 
+        self.get_parallel_coordinate() == other.get_parallel_coordinate()
+    }
+
+    fn get_intersection_indices(&self, other: &Word) -> Option<(usize, usize)>
+    {
+        if !self.intersects(other) { return None; }
+        if self.direction == other.direction { return None; }
+
+        match self.direction
+        {
+            WordDirection::Right => Some(((other.position.x - self.position.x) as usize, (self.position.y - other.position.y) as usize)),
+            WordDirection::Down => Some(((other.position.y - self.position.y) as usize, (self.position.x - other.position.x) as usize))
+        }
+    }
+
     pub fn calculate_possible_ways_to_add_word(&self, word: &'a str) -> BTreeSet<Word<'a>>
     {
         let mut pos_ways: BTreeSet<Word<'a>> = BTreeSet::new();
@@ -247,23 +241,6 @@ mod tests
     use super::*;
 
     #[test]
-    fn test_word_bounding_box_same_direction_as()
-    {
-        let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
-        let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
-
-        assert!(first.get_bounding_box().same_direction_as(&second.get_bounding_box()));
-
-        first.direction = WordDirection::Down;
-
-        assert!(!first.get_bounding_box().same_direction_as(&second.get_bounding_box()));
-
-        second.direction = WordDirection::Down;
-        
-        assert!(first.get_bounding_box().same_direction_as(&second.get_bounding_box()));
-    }
-
-    #[test]
     fn test_word_bounding_box_intersects()
     {
         let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
@@ -275,7 +252,7 @@ mod tests
             for x in -6isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().intersects(&second.get_bounding_box()) as isize);
+                comp.push(first.intersects(&second) as isize);
             }
         }
     
@@ -293,7 +270,7 @@ mod tests
             for x in -2isize..=2
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().intersects(&second.get_bounding_box()) as isize);
+                comp.push(first.intersects(&second) as isize);
             }
         }
 
@@ -321,7 +298,7 @@ mod tests
             for x in -2isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().intersects(&second.get_bounding_box()) as isize);
+                comp.push(first.intersects(&second) as isize);
             }
         }
 
@@ -348,7 +325,7 @@ mod tests
             for x in -6isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().side_touches_side(&second.get_bounding_box()) as isize);
+                comp.push(first.side_touches_side(&second) as isize);
             }
         }
     
@@ -366,7 +343,7 @@ mod tests
             for x in -2isize..=2
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().side_touches_side(&second.get_bounding_box()) as isize);
+                comp.push(first.side_touches_side(&second) as isize);
             }
         }
 
@@ -394,7 +371,7 @@ mod tests
             for x in -2isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().side_touches_side(&second.get_bounding_box()) as isize);
+                comp.push(first.side_touches_side(&second) as isize);
             }
         }
 
@@ -421,7 +398,7 @@ mod tests
             for x in -6isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().side_touches_head(&second.get_bounding_box()) as isize);
+                comp.push(first.side_touches_head(&second) as isize);
             }
         }
     
@@ -439,7 +416,7 @@ mod tests
             for x in -2isize..=2
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().side_touches_head(&second.get_bounding_box()) as isize);
+                comp.push(first.side_touches_head(&second) as isize);
             }
         }
 
@@ -467,7 +444,7 @@ mod tests
             for x in -2isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().side_touches_head(&second.get_bounding_box()) as isize);
+                comp.push(first.side_touches_head(&second) as isize);
             }
         }
 
@@ -494,7 +471,7 @@ mod tests
             for x in -6isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().head_touches_head(&second.get_bounding_box()) as isize);
+                comp.push(first.head_touches_head(&second) as isize);
             }
         }
     
@@ -512,7 +489,7 @@ mod tests
             for x in -2isize..=2
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().head_touches_head(&second.get_bounding_box()) as isize);
+                comp.push(first.head_touches_head(&second) as isize);
             }
         }
 
@@ -540,7 +517,7 @@ mod tests
             for x in -2isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().head_touches_head(&second.get_bounding_box()) as isize);
+                comp.push(first.head_touches_head(&second) as isize);
             }
         }
 
@@ -567,7 +544,7 @@ mod tests
             for x in -6isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().corners(&second.get_bounding_box()) as isize);
+                comp.push(first.corners_touch(&second) as isize);
             }
         }
     
@@ -585,7 +562,7 @@ mod tests
             for x in -2isize..=2
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().corners(&second.get_bounding_box()) as isize);
+                comp.push(first.corners_touch(&second) as isize);
             }
         }
 
@@ -613,7 +590,7 @@ mod tests
             for x in -2isize..=9
             {
                 second.position = WordPosition {x, y};
-                comp.push(first.get_bounding_box().corners(&second.get_bounding_box()) as isize);
+                comp.push(first.corners_touch(&second) as isize);
             }
         }
 
@@ -634,16 +611,16 @@ mod tests
         let mut first = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "hayastan" };
         let mut second = Word{ position: WordPosition{ x: 0, y: 0 }, direction: WordDirection::Right, value: "arcax" };
 
-        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), None);
+        assert_eq!(first.get_intersection_indices(&second), None);
 
         first.direction = WordDirection::Down;
-        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), Some((0, 0)));
+        assert_eq!(first.get_intersection_indices(&second), Some((0, 0)));
 
         second.position = WordPosition {x: -1, y: 2};
-        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), Some((2, 1)));
+        assert_eq!(first.get_intersection_indices(&second), Some((2, 1)));
 
         second.position.x = 2;
-        assert_eq!(first.get_bounding_box().get_intersection_indices(&second.get_bounding_box()), None);
+        assert_eq!(first.get_intersection_indices(&second), None);
     }
 
 
