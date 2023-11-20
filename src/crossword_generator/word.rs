@@ -60,7 +60,7 @@ impl Default for WordCompatibilitySettings
     }
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 struct WordBoundingBox
 {
     x: isize,
@@ -163,14 +163,14 @@ impl WordBoundingBox
 }
 
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct WordPosition
 {
     pub x: isize,
     pub y: isize,  
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum WordDirection
 {
     #[default]
@@ -190,7 +190,7 @@ impl WordDirection
     } 
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct Word<'a>
 {
     pub position: WordPosition,

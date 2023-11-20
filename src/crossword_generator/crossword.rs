@@ -43,9 +43,10 @@ impl CrosswordSettings
     }
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct Crossword<'a>
 {
+    #[serde(borrow)]
     words: BTreeSet<Word<'a>>,
 }
 
@@ -137,7 +138,6 @@ impl<'a> Crossword<'a>
     {
         if self.words.is_empty()
         {
-            dbg!(word);
             return vec![Word{ value: word, ..Word::default()}].into_iter().collect()
         }
 
@@ -353,13 +353,13 @@ mod tests {
         let new_word = "hatlo";
 
         assert_eq!(cw.calculate_possible_ways_to_add_word(&new_word, &WordCompatibilitySettings::default()), vec![
-            Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Down, value: new_word.clone()},
+            Word{position: WordPosition { x: 0, y: 0 }, direction: WordDirection::Down, value: new_word},
             //Word{position: WordPosition { x: 1, y: 1 }, direction: WordDirection::Down, value: new_word.clone()},  |-
             //Word{position: WordPosition { x: 1, y: 3 }, direction: WordDirection::Right, value: new_word.clone()}, ||
             //Word{position: WordPosition { x: 3, y: -3 }, direction: WordDirection::Down, value: new_word.clone()}, ||
-            Word{position: WordPosition { x: -1, y: 4 }, direction: WordDirection::Right, value: new_word.clone()},
+            Word{position: WordPosition { x: -1, y: 4 }, direction: WordDirection::Right, value: new_word},
             //Word{position: WordPosition { x: -2, y: 1 }, direction: WordDirection::Right, value: new_word.clone()},||
-            Word{position: WordPosition { x: 4, y: -4 }, direction: WordDirection::Down, value: new_word.clone()},
+            Word{position: WordPosition { x: 4, y: -4 }, direction: WordDirection::Down, value: new_word},
             ].into_iter().collect());
 
         // assert_eq!(cw.generate_string(), 
