@@ -3,6 +3,44 @@ use itertools::Itertools;
 
 use serde::{Serialize, Deserialize};
 
+
+/// Represents settings the dictate how two [words](Word) are allowed to be relatively positioned in a [crossword](super::crossword::Crossword) when not intersecting
+/// 
+/// 
+/// ## Examples
+/// 
+/// ```text
+///                   -------------
+/// side_by_side <-> |h e l l o    |
+///                  |    w o r l d|
+///                   -------------
+/// 
+///                   -------------------
+/// head_by_head <-> |h e l l o w o r l d|
+///                   ------------------- 
+/// 
+///                   ---------
+/// side_by_head <-> |h e l l o|
+///                  |    w    |
+///                  |    o    |
+///                  |    r    |
+///                  |    l    |
+///                  |    d    |
+///                   ---------
+/// 
+/// 
+///                       -----------
+/// corner_by_corner <-> |  h e l l o|
+///                      |w          |
+///                      |o          |
+///                      |r          |
+///                      |l          |
+///                      |d          |
+///                       -----------
+/// 
+/// true == allowed
+/// false == not allowed
+/// ```
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct WordCompatibilitySettings
 {
@@ -14,6 +52,7 @@ pub struct WordCompatibilitySettings
 
 impl WordCompatibilitySettings 
 {
+    /// Checks if two [words](Word) are compatible
     pub fn are_words_compatible(&self, first: &Word, second: &Word) -> bool
     {
         if first.corners_touch(&second) && !self.corner_by_corner { return false; }
@@ -91,6 +130,7 @@ impl WordBoundingBox
 }
 
 
+/// Represents the position of the first character of a [word](Word) in [crossword](super::crossword::Crossword)
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct WordPosition
 {
@@ -98,6 +138,7 @@ pub struct WordPosition
     pub y: isize,  
 }
 
+/// Represents the direction of a [word](Word) in [crossword](super::crossword::Crossword)
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum WordDirection
 {
@@ -118,6 +159,8 @@ impl WordDirection
     } 
 }
 
+
+/// Represents a word in [crossword](super::crossword::Crossword)
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct Word<'a>
 {
@@ -156,7 +199,8 @@ impl<'a> Word<'a>
         }
     }
 
-    fn intersects(&self, other: &Word) -> bool 
+    /// Returns true if two [words](Word) are intersecting 
+    pub fn intersects(&self, other: &Word) -> bool 
     {
         self.get_bounding_box().intersects(&other.get_bounding_box())
     }
@@ -166,32 +210,57 @@ impl<'a> Word<'a>
         self.get_bounding_box().sides_touch(&other.get_bounding_box())
     }
 
-    fn corners_touch(&self, other: &Word) -> bool
+    /// Returns true if two [words](Word) are corner by corner (check [WordCompatibilitySettings::corner_by_corner])
+    pub fn corners_touch(&self, other: &Word) -> bool
     {
         self.get_bounding_box().corners_touch(&other.get_bounding_box())
     }
 
-    fn side_touches_side(&self, other: &Word) -> bool
+    /// Returns true if two [words](Word) are side by side (check [WordCompatibilitySettings::side_by_side])
+    pub fn side_touches_side(&self, other: &Word) -> bool
     {
         self.direction == other.direction &&
         self.sides_touch(other) && 
         self.get_parallel_coordinate() != other.get_parallel_coordinate()
     }
 
-    fn side_touches_head(&self, other: &Word) -> bool
+    /// Returns true if two [words](Word) are side by head (check [WordCompatibilitySettings::side_by_head])
+    pub fn side_touches_head(&self, other: &Word) -> bool
     {
         self.direction != other.direction &&
         self.sides_touch(other)
     }
 
-    fn head_touches_head(&self, other: &Word) -> bool
+    /// Returns true if two [words](Word) are head by head (check [WordCompatibilitySettings::head_by_head])
+    pub fn head_touches_head(&self, other: &Word) -> bool
     {
         self.direction == other.direction &&
         self.sides_touch(other) && 
         self.get_parallel_coordinate() == other.get_parallel_coordinate()
     }
 
-    fn get_intersection_indices(&self, other: &Word) -> Option<(usize, usize)>
+    /// Returns the indices of the characters in the intersection of the [words](Word) if they are intersecting
+    /// 
+    /// Returns None otherwise
+    /// 
+    /// ## Examples
+    /// ```
+    /// # use crossword_generator::word::{Word, WordPosition, WordDirection};
+    /// let w1 = Word{ position: WordPosition{x: 0, y: 1}, direction: WordDirection::Right, value: "hello"};
+    /// let w2 = Word{ position: WordPosition{x: 4, y: 0}, direction: WordDirection::Down, value: "world"};
+    /// 
+    /// //         w
+    /// // h e l l o
+    /// //         r
+    /// //         l
+    /// //         d
+    /// 
+    /// assert_eq!(w1.get_intersection_indices(&w2), Some((4, 1)));
+    /// ```
+    /// 
+    /// Note that this function does not care if the characters on the intersection are not the same, so if the words are dog and cat, 
+    /// function can return non None result even though the words dog and cat don't have a common letter.
+    pub fn get_intersection_indices(&self, other: &Word) -> Option<(usize, usize)>
     {
         if !self.intersects(other) { return None; }
         if self.direction == other.direction { return None; }
@@ -203,6 +272,30 @@ impl<'a> Word<'a>
         }
     }
 
+    /// Returns all possible ways to add another [word](Word) on top of this 
+    /// 
+    /// ## Examples
+    /// ```
+    /// # use crossword_generator::word::{Word, WordPosition, WordDirection};
+    /// # use std::collections::BTreeSet;
+    /// let w1 = Word{ position: WordPosition{x: 0, y: 3}, direction: WordDirection::Right, value: "hello"};
+    /// 
+    /// 
+    /// //     w w 
+    /// //     o o 
+    /// //     r r w
+    /// // h e l l o ---> 3 ways
+    /// //     d d r
+    /// //         l
+    /// //         d
+    /// 
+    /// assert_eq!(w1.calculate_possible_ways_to_add_word("world"), BTreeSet::from([
+    ///     Word{ position: WordPosition{x: 2, y: 0}, direction: WordDirection::Down, value: "world"},
+    ///     Word{ position: WordPosition{x: 3, y: 0}, direction: WordDirection::Down, value: "world"},
+    ///     Word{ position: WordPosition{x: 4, y: 2}, direction: WordDirection::Down, value: "world"}
+    /// ]));
+    ///
+    /// ```
     pub fn calculate_possible_ways_to_add_word(&self, word: &'a str) -> BTreeSet<Word<'a>>
     {
         let mut pos_ways: BTreeSet<Word<'a>> = BTreeSet::new();

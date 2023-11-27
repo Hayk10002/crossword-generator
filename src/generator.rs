@@ -14,6 +14,8 @@ use corosensei::stack::DefaultStack;
 use super::word::*;
 use super::crossword::*;
 
+
+/// Represents settings needed for [crossword](Crossword) [generation](CrosswordGenerator)
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct CrosswordGeneratorSettings
 {
@@ -21,6 +23,13 @@ pub struct CrosswordGeneratorSettings
     pub crossword_settings: CrosswordSettings
 }
 
+/// Class for a generator
+/// 
+/// ## Fields
+/// 
+/// words -> set of strings, the words that will be used to generate [crosswords](Crossword)
+/// 
+/// settings -> [CrosswordGeneratorSettings]
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub struct CrosswordGenerator
 {
@@ -30,6 +39,9 @@ pub struct CrosswordGenerator
 
 impl CrosswordGenerator
 {
+    /// Generates all possible [crosswords](Crossword) constructed with [words](CrosswordGenerator::words) and the [settings](CrosswordGenerator::settings) taken into account
+    /// 
+    /// Returns a [BTreeSet] of crosswords 
     pub fn generate_crosswords(&self) -> BTreeSet<Crossword>
     {
         self.crossword_iter().collect::<BTreeSet<Crossword>>()
@@ -63,7 +75,7 @@ impl CrosswordGenerator
 
                 self.crossword_iter_rec_impl(yielder, current_crossword, &new_remained_words, full_created_crossword_bases);
 
-                let to_remove: Vec<Crossword<'a>> = full_created_crossword_bases.clone().into_iter().filter(|cw| cw.contains_crossword(&current_crossword)).collect();
+                let to_remove: Vec<Crossword<'a>> = full_created_crossword_bases.iter().filter_map(|cw| cw.contains_crossword(&current_crossword).then_some(cw.clone())).collect();
                 to_remove.into_iter().for_each(|cw| {full_created_crossword_bases.remove(&cw);});
                 
                 full_created_crossword_bases.insert(current_crossword.clone());
@@ -91,7 +103,9 @@ impl CrosswordGenerator
         }
     } 
 
-
+    /// Returns an iterator over all the [crosswords](Crossword) that can be created using [words](CrosswordGenerator::words) and [settings](CrosswordGenerator::settings)
+    /// 
+    /// This method's algorithm is not recursive, and it has a recursive counterpart crossword_iter_rec, accessible with feature 'rec-iter', which uses the create corosensei for coroutines. 
     pub fn crossword_iter(&self) -> CrosswordIterator
     {
         CrosswordIterator
@@ -139,6 +153,7 @@ impl<'a> Frame<'a>
     }
 }
 
+/// Iterator over [crosswords](Crossword)
 pub struct CrosswordIterator<'a>
 {
     settings: CrosswordGeneratorSettings,
@@ -289,7 +304,7 @@ mod tests {
     fn test_iterators() {
         let mut generator = CrosswordGenerator::default();
         generator.settings = CrosswordGeneratorSettings::default();
-        generator.settings.crossword_settings.size_constraints.push(CrosswordSizeConstrain::MaxLength(13));
+        generator.settings.crossword_settings.size_constraints.push(CrosswordSizeConstraint::MaxLength(13));
         generator.settings.word_compatibility_settings.side_by_head = true;
         generator.words = vec!["Hello", "world", "asdf", "myname", "sesame", "yeeee"].into_iter().map(|s| s.to_lowercase()).collect();
         assert_eq!(generator.crossword_iter().count(), generator.crossword_iter_rec().count());
